@@ -1,60 +1,89 @@
-# Astro Rasayana: Multi Agent Space Medicine System
+# Astro Rasayana: Multi-Agent Space Medicine System
 
-This project builds a data driven bridge between traditional medicine and aerospace biology. Synthetic pharmaceuticals degrade rapidly during space travel due to cosmic radiation. Long duration missions require self sustaining biological countermeasures. This architecture automates drug discovery by proving specific herbs possess the biochemical compounds required to treat cellular degradation in microgravity.
+This project builds a governed, data-driven bridge between traditional Ayurvedic Rasayana medicine and aerospace biology. Synthetic pharmaceuticals degrade rapidly during space travel due to cosmic radiation. Long-duration missions require self-sustaining biological countermeasures. This system screens Himalayan flora classified as Rasayana (rejuvenative) herbs against a chosen physiological stressor, and only recommends a herb when it can triangulate three independent legs of evidence: a traditional classification, live PubMed literature, and a live NASA GeneLab spaceflight dataset.
 
-This repository provides the complete source code so you can reproduce the automated drug discovery pipeline. 
+This repository provides two ways to run the pipeline:
+
+1.  **A command-line tool** (`agents/supervisor.py`) for local runs, with manual input via CLI flags or interactive prompts, and a saved JSON + Markdown report.
+2.  **A self-contained Kaggle notebook** (`astro_rasayana_kaggle_notebook.ipynb`) built for the [Kaggle Agents Intensive Capstone](https://www.kaggle.com/competitions/agents-intensive-capstone-project), with an interactive `ipywidgets` UI and a styled HTML report display.
 
 ## System Orchestration
 
-The system deploys three distinct Model Context Protocol servers orchestrated by a Supervisor Agent.
+Three specialist tools are orchestrated by a Supervisor Agent using Gemini function calling:
 
-*   **The Botanist Agent:** Extracts classical Rasayana herbs and active compounds from a structured Himalayan flora dataset.
-*   **The Clinician Agent:** Queries the live PubMed API to validate these compounds against modern clinical trials targeting oxidative stress.
-*   **The Flight Surgeon Agent:** Queries the NASA GeneLab API to retrieve aerospace datasets related to microgravity stress factors.
+*   **The Botanist Agent:** Extracts classical Rasayana herbs and active compounds from a structured Himalayan flora dataset, optionally pre-filtered to a target stressor by keyword match.
+*   **The Clinician Agent:** Queries the live PubMed API to validate each herb's active compounds against modern clinical or preclinical literature for the target stressor.
+*   **The Flight Surgeon Agent:** Queries the live NASA GeneLab API to retrieve spaceflight datasets related to the target stressor.
 
-The Supervisor Agent enforces the Triangulation Mandate. It refuses to recommend a botanical countermeasure unless it successfully links a Rasayana herb, a verified PubMed clinical trial, and a NASA GeneLab dataset. 
+The Supervisor Agent enforces the **Triangulation Mandate**: it will not recommend a botanical countermeasure unless it successfully links a Rasayana herb, real PubMed evidence, and a real NASA GeneLab dataset. This is enforced **in code**, not just by instructing the model to enforce it — every tool call is logged with its exact arguments and raw result, and a deterministic pass/reject decision is computed from that log after the agent finishes, independent of what the model's own closing message claims. Herbs that fail are shown in the report alongside the specific reason they were rejected, not silently dropped.
+
+> **Note on "agents":** the Botanist, Clinician, and Flight Surgeon tools are plain Python functions passed to Gemini's function-calling API and orchestrated in-process by the Supervisor — not separate MCP server processes communicating over stdio, despite the `mcp_servers/` naming and `FastMCP` decorators. That naming is kept for continuity with the tool definitions; if you need genuine multi-process MCP client/server orchestration, the `mcp.client.stdio` wiring would need to be added on top of this.
 
 ## A. Installation
 
-You must install Python 3.10 or higher. 
+You must install Python 3.10 or higher.
 
 ### 1. Clone this repository to your local machine.
 
 ```
-git clone [https://github.com/drdebabratamondal/astro_rasayana.git](https://github.com/drdebabratamondal/astro_rasayana.git)
+git clone https://github.com/drdebabratamondal/astro_rasayana.git
 cd astro_rasayana
 ```
 
 ### 2. Install the required dependencies.
 
-PowerShell
-
 ```
 pip install -r requirements.txt
 ```
 
-### 3.Create a `.env` file in the root directory. Add your Google Gemini API key.
-
-Plaintext
+### 3. Create a `.env` file in the root directory. Add your Google Gemini API key.
 
 ```
 GEMINI_API_KEY="your_api_key_here"
 ```
 
-## B. Execution
+### 4. Add your dataset.
 
-### 1. Run the supervisor script to start the multi-agent pipeline.
+Place your Himalayan flora CSV at `data/himalayan_flora.csv`, with at minimum the columns `scientific_name`, `traditional_property`, `active_compounds`, and `clinical_targets`.
 
-PowerShell
+## B. Running the Command-Line Tool
+
+The CLI no longer hardcodes the target stressor or dataset path — both are supplied manually, either as flags or via interactive prompts.
+
+### Interactive mode
 
 ```
 python agents/supervisor.py
 ```
 
-The terminal will output a statistical therapeutic viability report confirming the efficacy of specific plants for spaceflight application.
+You'll be prompted to pick a target stressor from a preset list (or enter a custom one) and an optional mission duration in months.
+
+### Non-interactive mode
+
+```
+python agents/supervisor.py --stressor "bone density loss" --mission-duration 9 --csv data/himalayan_flora.csv
+```
+
+Available flags: `--stressor`, `--csv`, `--mission-duration`, `--output-dir` (defaults to `outputs/`).
+
+### Output
+
+Each run writes two files to the output directory instead of only printing to the terminal:
+
+*   `astro_report_<timestamp>.json` — the full structured report, including every finding's evidence and the raw tool-call log, for auditing or downstream use.
+*   `astro_report_<timestamp>.md` — a human-readable rendering of the same report, generated by template (not by the model), covering:
+    *   **Completeness Check** — how many herbs were identified vs. actually evaluated
+    *   **Accepted Countermeasures** — herbs that passed the Triangulation Mandate, with clickable PubMed and GeneLab citations
+    *   **Rejected Herbs** — herbs that failed, with the specific missing leg of evidence named
+    *   **Limitations** — a standing disclaimer that this is a research screening tool, not a clinical or regulatory recommendation
+
+A summary is also printed to the terminal for quick feedback.
+
 
 ## About the Author
 
 Dr. Debabrata Mondal is an Ayurvedic Physician. This project scales clinical methodologies used for scientific validation of traditional formulations into aerospace applications.
+
+**Disclaimer:** This is a research screening tool. No herb identified by this system has been tested on astronauts or approved for spaceflight use, and its output does not constitute medical, clinical, or regulatory advice.
 
 --------------
